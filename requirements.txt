@@ -1,0 +1,7 @@
+
+numpy>=1.24
+pandas>=2.2
+requests>=2.31
+fastapi>=0.111    # or flask==3.x   → pick the one you’re using
+uvicorn[standard]>=0.29
+pytest>=8.1       # optional dev-only

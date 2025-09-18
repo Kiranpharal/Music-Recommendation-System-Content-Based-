@@ -1,0 +1,2 @@
+# cached model artefacts
+server/app/dataset/*.npy

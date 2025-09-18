@@ -1,0 +1,17 @@
+{
+  "name": "music-recommender",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "concurrently \"npm run frontend\" \"npm run backend\"",
+    "frontend": "cd client && npm start",
+    "backend": "cd server && uvicorn app.main:app --reload"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0"
+  },
+  "dependencies": {
+    "react-player": "^3.3.2",
+    "react-youtube": "^10.1.0"
+  }
+}
