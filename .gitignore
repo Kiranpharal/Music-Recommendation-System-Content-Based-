@@ -1,2 +1,79 @@
-# cached model artefacts
+##############################
+# GLOBAL IGNORES
+##############################
+
+# OS generated
+.DS_Store
+Thumbs.db
+
+##############################
+# PYTHON / FASTAPI BACKEND
+##############################
+
+# Virtual env
+venv/
+.venv/
+
+# Byte-compiled / cache files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Environment variables
+*.env
+.env
+server/.env
+
+# Python build artifacts
+build/
+dist/
+*.egg-info/
+
+# SQLite database
+*.db
+server/app/music_recommender.db
+
+# Cache folders
+server/app/cache/
+.cache/
+
+# Dataset (never upload)
 server/app/dataset/
+*.npy
+
+##############################
+# FRONTEND (React)
+##############################
+
+# Dependencies
+node_modules/
+
+# Build output
+client/build/
+client/dist/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Cache
+client/.cache/
+client/.parcel-cache/
+.client/
+
+##############################
+# MEDIA (OPTIONAL)
+##############################
+
+# Images you don't want tracked
+client/public/music.avif
+client/src/components/music.avif
+
+##############################
+# ADMIN PANEL EXCLUDES
+##############################
+
+# Ignore generated admin assets
+client/src/admin/*.css
