@@ -1,397 +1,157 @@
-/* ───────── Reset & Base ───────── */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-}
-
-html, body {
-  height: 100%;
-  background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-  color: #fff;
-  overflow-x: hidden;
-}
-
-/* ───────── App Container ───────── */
+/* ===================================
+    GLOBAL APP WRAPPER
+=================================== */
 .App {
-  display: flex;
-  flex-direction: column;
   min-height: 100vh;
-}
+  padding: 24px 26px 120px; /* bottom padding for player */
+  margin-left: 240px;
 
-/* ───────── Header & Navigation ───────── */
-.user-nav {
-  display: flex;
-  gap: 20px;
-  align-items: center;
-  padding: 1rem 2rem;
-  background: rgba(0, 0, 0, 0.8);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.7);
-}
-
-.user-nav button,
-.logout-btn {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 16px 22px;       /* bigger default size */
-  border-radius: 15px;
-  border: none;
-  color: #fff;
-  font-size: 1.15rem;       /* bigger text */
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
+  gap: 18px;
+
+  color: #e5e7eb; /* soft light text */
+  background: transparent;
+
+  transition: margin-left 0.28s ease;
 }
 
-.user-nav button {
-  background: rgba(255, 255, 255, 0.1);
-  min-width: 110px;         /* bigger width */
+/* Sidebar collapsed → shift app left */
+body.sidebar-collapsed .App {
+  margin-left: 70px !important;
 }
 
-.user-nav button i {
-  font-size: 2.1rem;        /* bigger icons */
-  margin-bottom: 6px;
+/* Smooth page container shells */
+.home-page,
+.liked-songs-page,
+.playlists-page,
+.profile-page {
+  background: rgba(255, 255, 255, 0.03); /* soft matte layer */
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 18px 20px;
+  width: 100%;
+  box-sizing: border-box;
+
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(10px);
 }
 
-.user-nav button.active {
-  background: linear-gradient(90deg, #ff6a00, #ee0979);
+.home-sub {
+  color: #9ca3af;
+  margin-top: 4px;
 }
 
-.user-nav button:hover {
-  transform: translateY(-2px) scale(1.08);
-  opacity: 0.95;
-}
-
-.logout-btn {
-  background: rgba(255, 0, 0, 0.7);
-}
-
-.logout-btn i {
-  font-size: 2.1rem;
-  margin-bottom: 6px;
-}
-
-.logout-btn:hover {
-  background: rgba(255, 0, 0, 0.9);
-  transform: translateY(-2px) scale(1.08);
-}
-
-/* ───────── Search Bar ───────── */
+/* ===================================
+        SEARCH BAR
+=================================== */
 .search-container {
-  position: relative;
   display: flex;
   justify-content: center;
-  width: 100%;
-  margin: 1.5rem 0;
-  z-index: 60;
+  position: relative;
+  margin-top: 4px;
 }
 
 .search-input {
-  width: 750px;             /* wider */
-  max-width: 95%;
-  padding: 20px 30px;       /* more padding */
-  font-size: 1.35rem;       /* larger text */
-  border-radius: 35px;
-  border: 1px solid #333;
-  background-color: #1c1c1c;
-  color: #fff;
-  transition: all 0.3s ease;
+  width: 100%;
+  max-width: 640px;
+
+  padding: 12px 18px;
+
+  border-radius: 12px;
+  background: #10121a;
+  border: 1px solid #2b2f3a;
+
+  color: #e5e7eb;
+  font-size: 0.95rem;
+
+  outline: none;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
 .search-input:focus {
-  border-color: #1db954;
-  outline: none;
-  box-shadow: 0 0 12px rgba(29, 185, 84, 0.7);
+  border-color: #6366f1; /* elegant indigo accent */
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.25);
 }
 
-/* ───────── Suggestions ───────── */
+/* Suggestions dropdown */
 .suggestion-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  background-color: #1e1e1e;
-  border: 1px solid #333;
-  border-top: none;
-  max-height: 250px;
-  overflow-y: auto;
   position: absolute;
-  top: 100%;
-  left: 0;
+  top: 110%;
+
   width: 100%;
-  z-index: 1000;
-  border-radius: 0 0 12px 12px;
+  max-width: 640px;
+  padding: 6px 0;
+  margin-top: 6px;
+
+  background: #0c0f17;
+  border: 1px solid #262a33;
+  border-radius: 12px;
+
+  box-shadow: 0 20px 36px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(10px);
+
+  list-style: none;
+  overflow-y: auto;
+  max-height: 260px;
 }
 
 .suggestion-list li {
-  padding: 16px 20px;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  color: #d1d5db;
+
   cursor: pointer;
-  border-bottom: 1px solid #333;
-  transition: background 0.2s ease;
-  font-size: 1.1rem;
+  transition: background 0.18s ease;
 }
 
 .suggestion-list li:hover {
-  background-color: #292929;
-  color: #1db954;
+  background: rgba(255, 255, 255, 0.06);
 }
 
-/* ───────── Loading & Error ───────── */
-.loading,
-.error,
-.no-recommendations {
-  text-align: center;
-  font-size: 1.3rem;
-  margin-top: 1.5rem;
+/* Loading hint */
+.loading {
+  color: #9ca3af;
+  font-size: 0.85rem;
+  margin-top: 6px;
 }
 
-.error {
-  color: #ff4c4c;
-  font-weight: bold;
-}
+/* ===================================
+      RECOMMENDATIONS GRID
+=================================== */
 
-.no-recommendations {
-  color: #ffcc00;
-  font-weight: 500;
-}
-
-/* ───────── Recommendation Heading ───────── */
 .recommendation-heading {
-  font-size: 2.2rem;
-  font-weight: 600;
-  margin: 2rem 0 1rem 0;
-  color: #ff6f61;
-  text-align: center;
+  margin-top: 12px;
+  font-size: 1.2rem;
+  color: #f3f4f6;
 }
 
 .recommendation-heading em {
   font-style: normal;
-  color: #1db954;
+  color: #6366f1;
 }
 
-/* ───────── Recommendations Container ───────── */
 .recommendations {
+  margin-top: 14px;
+
   display: flex;
-  gap: 1.2rem;
-  padding: 1rem 2rem;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scroll-padding-left: 2rem;
-  scroll-behavior: smooth;
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+  flex-wrap: wrap;
+  gap: 18px;
+
+  padding-bottom: 40px;
 }
 
-.recommendations::-webkit-scrollbar {
-  display: none;
-}
+/* ===================================
+      RESPONSIVE BEHAVIOR
+=================================== */
 
-/* ───────── Individual Card ───────── */
-.card {
-  flex: 0 0 calc((100% - 5rem) / 5); /* 5 per row desktop */
-  scroll-snap-align: start;
-  background: linear-gradient(to bottom, #1e1e1e, #2a2a2a);
-  padding: 1.2rem;
-  border-radius: 16px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.7);
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
+@media (max-width: 768px) {
+  .App {
+    margin-left: 0 !important;
+    padding: 18px 14px 150px;
+  }
 
-.card:hover {
-  transform: scale(1.12);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.85);
-}
-
-.album-img {
-  width: 100%;
-  height: auto;
-  border-radius: 12px;
-  margin-bottom: 1rem;
-}
-
-.card h3 {
-  font-size: 1.5rem;
-  color: #1db954;
-  margin: 0.6rem 0;
-}
-
-.card p {
-  margin: 0.4rem 0;
-  font-size: 1.1rem;
-  color: #ccc;
-}
-
-/* ───────── Audio Player ───────── */
-.audio-player {
-  margin-top: 1rem;
-  width: 100%;
-  background: #121212;
-  padding: 10px;
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.play-button,
-.yt-fallback {
-  padding: 14px 28px;
-  font-size: 1.05rem;
-  border-radius: 50px;
-  border: none;
-  cursor: pointer;
-  color: #fff;
-  transition: all 0.2s ease;
-}
-
-.play-button {
-  background-color: #1db954;
-}
-
-.play-button:hover {
-  background-color: #1ed760;
-  transform: scale(1.08);
-}
-
-.yt-fallback {
-  background-color: #cc0000;
-  text-decoration: none;
-  display: inline-block;
-  text-align: center;
-}
-
-.yt-fallback:hover {
-  background-color: #ff4444;
-  transform: scale(1.08);
-}
-
-/* ───────── Add to Playlist ───────── */
-.add-to-playlist {
-  margin-top: 12px;
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.add-to-playlist select {
-  padding: 10px 14px;
-  border-radius: 10px;
-  border: 1px solid #333;
-  background-color: #1c1c1c;
-  color: #fff;
-  cursor: pointer;
-  font-size: 1.05rem;
-  transition: all 0.2s ease;
-}
-
-.add-to-playlist select:hover {
-  border-color: #1db954;
-}
-
-.add-to-playlist button {
-  padding: 10px 18px;
-  font-size: 1.05rem;
-  border-radius: 12px;
-  border: none;
-  background-color: #1db954;
-  color: #fff;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.add-to-playlist button:hover {
-  background-color: #1ed760;
-  transform: scale(1.08);
-}
-
-/* ───────── Playlists Page ───────── */
-.playlists-page {
-  padding: 1rem 2rem;
-}
-
-.playlist-list {
-  list-style: none;
-  padding: 0;
-  margin-top: 1rem;
-}
-
-.playlist-list li {
-  padding: 16px 20px;
-  margin-bottom: 10px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.05);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 1.15rem;
-}
-
-.playlist-list li:hover {
-  background: rgba(29, 185, 84, 0.3);
-  transform: translateX(5px);
-}
-
-.playlists-page button {
-  padding: 12px 22px;
-  border-radius: 12px;
-  border: none;
-  background: #1db954;
-  color: #fff;
-  margin-bottom: 1rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.playlists-page button:hover {
-  background: #1ed760;
-  transform: scale(1.08);
-}
-
-/* ───────── Delete Playlist Button ───────── */
-.delete-btn {
-  padding: 12px 22px;
-  border-radius: 12px;
-  border: none;
-  background: rgba(255, 0, 0, 0.7);
-  color: #fff;
-  margin: 0.5rem 0 1rem 0;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.delete-btn:hover {
-  background: rgba(255, 0, 0, 0.9);
-  transform: scale(1.08);
-}
-
-/* ───────── Liked Songs ───────── */
-.liked-heart {
-  color: #ff4c4c;
-  font-size: 1.6rem;
-  margin-left: 8px;
-}
-
-/* ───────── Responsive Breakpoints ───────── */
-@media (max-width: 1400px) {
-  .card { flex: 0 0 calc((100% - 6rem) / 6); }
-  .search-input { width: 580px; }
-}
-
-@media (max-width: 1100px) {
-  .card { flex: 0 0 calc((100% - 4rem) / 4); }
-  .search-input { width: 460px; }
-}
-
-@media (max-width: 800px) {
-  .card { flex: 0 0 calc((100% - 2rem) / 2); }
-  .search-input { width: 320px; }
-}
-
-@media (max-width: 500px) {
-  .card { flex: 0 0 100%; }
-  .search-input { width: 90%; }
+  .recommendations {
+    justify-content: center;
+  }
 }

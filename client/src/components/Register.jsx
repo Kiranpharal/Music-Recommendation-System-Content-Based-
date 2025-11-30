@@ -1,77 +1,103 @@
 import { useState } from "react";
-import { registerUser, loginUser } from "../api/api";
+import { registerUser } from "../api/api";
 
-export default function Register({ switchToLogin, onRegisterSuccess }) {
+export default function Register({ switchToLogin }) {
   const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false);
+
+  const [error, setError]       = useState("");
+  const [success, setSuccess]   = useState("");
+  const [loading, setLoading]   = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(null);
+    setError("");
+    setSuccess("");
     setLoading(true);
 
     try {
-      // ✅ Register the user
       await registerUser(username, email, password);
 
-      // ✅ Auto-login after successful registration
-      const res = await loginUser(email, password);
-      const token = res.access_token;
-      localStorage.setItem("token", token);
-      onRegisterSuccess?.(token); // notify parent
+      setSuccess("Your account has been created! You can now sign in.");
+
+      // Reset fields
+      setUsername("");
+      setEmail("");
+      setPassword("");
+
+      // Give the user a moment to read the message
+      setTimeout(() => {
+        if (switchToLogin) switchToLogin();
+      }, 1200);
+
     } catch (err) {
-      const data = err.response?.data;
-      if (data?.detail && Array.isArray(data.detail)) {
-        setError(data.detail.map((e) => e.msg).join(", "));
-      } else if (data?.detail) {
-        setError(data.detail);
-      } else if (data?.message) {
-        setError(data.message);
-      } else {
-        setError("Registration failed");
-      }
+      console.error(err);
+
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        err?.message ||
+        "We couldn’t create your account. Please try again.";
+
+      setError(msg);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div>
-      <h2>Register</h2>
+    <div className="auth-form">
+      <h2>Create Your TuneFlow Account</h2>
+
       <form onSubmit={handleSubmit}>
-        <input
-          type="text"
-          placeholder="Username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          required
-        />
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
+        <label>
+          Username
+          <input
+            type="text"
+            placeholder="Choose a username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+          />
+        </label>
+
+        <label>
+          Email
+          <input
+            type="email"
+            placeholder="Enter your email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+        </label>
+
+        <label>
+          Password
+          <input
+            type="password"
+            placeholder="Create a password (6+ characters)"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+        </label>
+
+        {error && <div className="auth-error">{error}</div>}
+        {success && <div className="auth-success">{success}</div>}
+
         <button type="submit" disabled={loading}>
-          {loading ? "Registering…" : "Register"}
+          {loading ? "Creating your account…" : "Create Account"}
         </button>
-        {error && <p className="error-msg">{error}</p>}
       </form>
-      <p className="auth-text">Already have an account?</p>
-      <button className="link-btn" onClick={switchToLogin}>
-        Login
-      </button>
+
+      <div className="auth-switch">
+        <span>Already have an account?</span>
+        <button type="button" onClick={switchToLogin}>
+          Sign In
+        </button>
+      </div>
     </div>
   );
 }

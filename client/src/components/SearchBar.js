@@ -1,80 +1,82 @@
-import React, { useState, useEffect, useRef } from "react";
+// client/src/components/SearchBar.js
+import React, { useState, useEffect } from "react";
+import { searchSongs } from "../api/api";
 
-const SearchBar = ({ onSongSelect, token = null }) => {
+const SearchBar = ({ onSongSelect }) => {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
-  const inputRef = useRef(null);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   useEffect(() => {
-    if (query.trim().length < 2) {
+    if (!query.trim()) {
       setSuggestions([]);
+      setShowSuggestions(false);
       return;
     }
 
-    const controller = new AbortController();
-
-    const loadSuggestions = async () => {
-      setLoading(true);
+    setLoading(true);
+    const id = setTimeout(async () => {
       try {
-        const res = await fetch(
-          `http://localhost:8000/search?q=${encodeURIComponent(query)}`,
-          {
-            signal: controller.signal,
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-          }
-        );
-
-        if (!res.ok) throw new Error("Failed to fetch suggestions");
-
-        const data = await res.json();
-        setSuggestions(Array.isArray(data) ? data : []);
+        const res = await searchSongs(query, 8);
+        setSuggestions(res || []);
+        setShowSuggestions(true);
       } catch (err) {
-        if (err.name !== "AbortError") {
-          console.error("Search error:", err);
-          setSuggestions([]);
-        }
+        console.error("Error fetching suggestions:", err);
+        setSuggestions([]);
+        setShowSuggestions(false);
       } finally {
         setLoading(false);
       }
-    };
+    }, 300);
 
-    loadSuggestions();
+    return () => clearTimeout(id);
+  }, [query]);
 
-    return () => controller.abort(); // Cancel previous request on query change
-  }, [query, token]);
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!query.trim()) return;
+    onSongSelect(query.trim());
+    setShowSuggestions(false);
+  };
 
-  const handleSelect = (song) => {
-    setQuery(song.name);       // Update input value immediately
-    setSuggestions([]);        // Hide suggestions
-    onSongSelect(song.name);   // Trigger recommendation fetch immediately
+  const handleSuggestionClick = (song) => {
+    const name = song.name || "";
+    if (!name) return;
+    setQuery(name);
+    onSongSelect(name);
+    setShowSuggestions(false);
   };
 
   return (
     <div className="search-container">
-      <input
-        ref={inputRef}
-        className="search-input"
-        type="text"
-        placeholder="Search for a song..."
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-      />
+      <form onSubmit={handleSubmit} style={{ width: "100%" }}>
+        <input
+          className="search-input"
+          type="text"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+          }}
+          placeholder="Search for a song..."
+          autoComplete="off"
+        />
+      </form>
 
-      {loading && <p className="loading">Loading suggestions…</p>}
-
-      {suggestions.length > 0 && (
+      {showSuggestions && suggestions.length > 0 && (
         <ul className="suggestion-list">
-          {suggestions.map((song, idx) => (
+          {suggestions.map((s, idx) => (
             <li
-              key={`${song.name}-${idx}`}
-              onClick={() => handleSelect(song)}
+              key={`${s.id || s.name}-${idx}`}
+              onClick={() => handleSuggestionClick(s)}
             >
-              {song.name} — {song.artists}
+              {s.name} {s.artists ? `– ${s.artists}` : ""}
             </li>
           ))}
         </ul>
       )}
+
+      {loading && <p className="loading">Searching…</p>}
     </div>
   );
 };

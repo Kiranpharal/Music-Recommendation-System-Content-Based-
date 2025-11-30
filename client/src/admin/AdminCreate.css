@@ -1,0 +1,72 @@
+.admin-create-container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 35px;
+  background: #1e293b;
+  border-radius: 12px;
+  color: white;
+}
+
+.admin-create-title {
+  font-size: 28px;
+  font-weight: bold;
+  margin-bottom: 25px;
+  text-align: center;
+}
+
+.admin-create-form label {
+  display: block;
+  margin-bottom: 6px;
+  color: #cbd5e1;
+  font-size: 15px;
+}
+
+.admin-create-form input {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 18px;
+  border: none;
+  border-radius: 6px;
+  background: #0f172a;
+  color: white;
+  font-size: 16px;
+  outline: none;
+}
+
+.admin-create-form input::placeholder {
+  color: #64748b;
+}
+
+.admin-create-btn {
+  width: 100%;
+  padding: 12px;
+  background: #2563eb;
+  border: none;
+  color: white;
+  font-size: 17px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.admin-create-btn:hover {
+  background: #1d4ed8;
+}
+
+.admin-success {
+  background: #065f46;
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 15px;
+  text-align: center;
+  font-size: 15px;
+}
+
+.admin-error {
+  background: #7f1d1d;
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 15px;
+  text-align: center;
+  font-size: 15px;
+}

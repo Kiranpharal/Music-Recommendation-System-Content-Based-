@@ -1,14 +1,27 @@
 from __future__ import annotations
 
-import sys, os, ast, json, hashlib, asyncio, httpx, re
+# --------------------------------------------
+# FIX FOR OLD PICKLE PATHS (IMPORTANT)
+# --------------------------------------------
+import sys
+import app as app_package
+sys.modules['app'] = app_package
+
+# --------------------------------------------
+# Standard imports
+# --------------------------------------------
+import os, ast, json, hashlib, asyncio, httpx, re
 from pathlib import Path
 from urllib.parse import quote
 import numpy as np
 import pandas as pd
 from difflib import get_close_matches
 from joblib import Memory, dump, load
-import faiss
 from bs4 import BeautifulSoup
+
+# sklearn fallback (since FAISS does NOT support Python 3.14)
+from sklearn.neighbors import NearestNeighbors
+
 from .utils import MyMinMaxScaler, kmeans_mini_batch
 
 # -------------------------
@@ -22,7 +35,7 @@ memory = Memory(str(CACHE_DIR), verbose=0)
 CSV_PATH = BASE_DIR / "dataset" / "master_tracks.csv"
 SCALER_FILE = CACHE_DIR / "scaler.joblib"
 LABEL_FILE = CACHE_DIR / "labels.npy"
-FAISS_INDEX_FILE = CACHE_DIR / "faiss_ivf.index"
+INDEX_FILE = CACHE_DIR / "nn_index.joblib"        # sklearn index
 ITUNES_CACHE_FILE = CACHE_DIR / "itunes_cache.json"
 
 # -------------------------
@@ -44,9 +57,6 @@ FEATURE_EMOTION_MAP = {
 }
 FEATURES_FOR_EMOTION = list(FEATURE_EMOTION_MAP.keys())
 
-# -------------------------
-# Default artwork & preview
-# -------------------------
 DEFAULT_ARTWORK = "https://example.com/default_artwork.png"
 DEFAULT_PREVIEW = None
 
@@ -111,11 +121,11 @@ final_data = df.copy()
 def auto_label_emotion(cluster_df: pd.DataFrame):
     means = cluster_df[FEATURES_FOR_EMOTION].mean()
     min_val, max_val = means.min(), means.max()
-    means_norm = (means - min_val) / (max_val - min_val) if max_val - min_val > 0 else means*0
+    means_norm = (means - min_val) / (max_val - min_val) if max_val - min_val > 0 else means * 0
     top_feat = means_norm.idxmax()
     val = means_norm[top_feat]
     intensity = "Low" if val < 0.33 else "Medium" if val < 0.66 else "High"
-    mood = FEATURE_EMOTION_MAP.get(top_feat, top_feat.replace('_',' ').title())
+    mood = FEATURE_EMOTION_MAP.get(top_feat, top_feat.replace('_', ' ').title())
     return f"{intensity} {mood}"
 
 CLUSTER_NAMES = {
@@ -124,30 +134,19 @@ CLUSTER_NAMES = {
 }
 
 # -------------------------
-# Title map for search
+# Title map
 # -------------------------
 title_map = {name.lower(): idx for idx, name in enumerate(df['name'])}
 
 # -------------------------
-# FAISS index
+# NearestNeighbors index (FAISS alternative)
 # -------------------------
-DIM = X_scaled.shape[1]
-X_norm = X_scaled / np.linalg.norm(X_scaled, axis=1, keepdims=True)
-
-def build_faiss_ivf_index(X, nlist=500):
-    quantizer = faiss.IndexFlatIP(DIM)
-    index = faiss.IndexIVFFlat(quantizer, DIM, nlist, faiss.METRIC_INNER_PRODUCT)
-    index.train(X.astype(np.float32))
-    index.add(X.astype(np.float32))
-    return index
-
-if FAISS_INDEX_FILE.exists():
-    faiss_index = faiss.read_index(str(FAISS_INDEX_FILE))
+if INDEX_FILE.exists():
+    nn = load(INDEX_FILE)
 else:
-    faiss_index = build_faiss_ivf_index(X_norm)
-    faiss.write_index(faiss_index, str(FAISS_INDEX_FILE))
-
-faiss_index.nprobe = 20
+    nn = NearestNeighbors(metric="cosine", algorithm="brute")
+    nn.fit(X_scaled)
+    dump(nn, INDEX_FILE)
 
 # -------------------------
 # iTunes fetch
@@ -174,11 +173,11 @@ async def fetch_itunes(client: httpx.AsyncClient, song: str, artist: str):
             img = r.get("artworkUrl100") or r.get("artworkUrl60")
             if img:
                 img = img.replace("100x100bb", "300x300bb")
-            prev = r.get("previewUrl")  # Direct audio file
+            prev = r.get("previewUrl")
             ITUNES_CACHE[key] = (img, prev)
             return key, (img, prev)
     except Exception as e:
-        print(f"iTunes fetch error for '{song}' by '{artist}': {e}")
+        print(f"iTunes fetch error: {e}")
 
     ITUNES_CACHE[key] = (None, None)
     return key, (None, None)
@@ -192,7 +191,7 @@ async def fetch_itunes_batch(songs):
         return {k: v for k, v in results}
 
 # -------------------------
-# YouTube fallback (no API)
+# YouTube fallback
 # -------------------------
 async def get_youtube_thumbnail_and_url(song, artist):
     query = f"{song} {artist} audio"
@@ -200,12 +199,14 @@ async def get_youtube_thumbnail_and_url(song, artist):
     async with httpx.AsyncClient(timeout=10) as client:
         resp = await client.get(search_url)
         html = resp.text
+
     match = re.search(r"\"videoId\":\"([a-zA-Z0-9_-]{11})\"", html)
     if match:
-        video_id = match.group(1)
-        thumbnail = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
-        video_url = f"https://www.youtube.com/watch?v={video_id}"
-        return thumbnail, video_url
+        vid = match.group(1)
+        return (
+            f"https://img.youtube.com/vi/{vid}/hqdefault.jpg",
+            f"https://www.youtube.com/watch?v={vid}"
+        )
     return None, None
 
 # -------------------------
@@ -216,11 +217,12 @@ def search_titles(query: str, limit: int = 10):
     idx = title_map.get(q)
     if idx is not None:
         return final_data.iloc[[idx]][["name", "artists"]].to_dict("records")
+
     mask = final_data['name'].str.lower().str.startswith(q)
     return final_data.loc[mask].head(limit)[["name", "artists"]].to_dict("records")
 
 # -------------------------
-# Recommendations (audio + YouTube fallback)
+# Recommendations
 # -------------------------
 async def get_recommendations(query: str, top_n: int = 10, include_query: bool = False):
     q_lower = query.lower().strip()
@@ -239,21 +241,24 @@ async def get_recommendations(query: str, top_n: int = 10, include_query: bool =
         return []
 
     anchor_idx = matches[0]
-    anchor_vec = X_norm[anchor_idx].reshape(1, -1)
-    D, I = faiss_index.search(anchor_vec.astype(np.float32), top_n + 20)
-    indices = I[0]
+    anchor_vec = X_scaled[anchor_idx].reshape(1, -1)
 
-    weighted_scores = []
-    for idx in indices:
+    distances, indices = nn.kneighbors(anchor_vec, n_neighbors=top_n + 20)
+
+    distances = distances[0]
+    indices = indices[0]
+
+    weighted = []
+    for dist, idx in zip(distances, indices):
         if idx == anchor_idx:
             continue
-        sim = float(D[0][np.where(indices==idx)[0][0]])
+        sim = 1 - dist
         cluster_bonus = 0.1 if final_data.loc[idx, "cluster"] == final_data.loc[anchor_idx, "cluster"] else 0
         artist_bonus = 0.1 if final_data.loc[idx, "artists"] == final_data.loc[anchor_idx, "artists"] else 0
-        weighted_scores.append((idx, sim + cluster_bonus + artist_bonus))
+        weighted.append((idx, sim + cluster_bonus + artist_bonus))
 
-    weighted_scores.sort(key=lambda x: x[1], reverse=True)
-    rec_indices = [idx for idx, _ in weighted_scores[:top_n]]
+    weighted.sort(key=lambda x: x[1], reverse=True)
+    rec_indices = [idx for idx, _ in weighted[:top_n]]
     if include_query:
         rec_indices = [anchor_idx] + rec_indices
 
@@ -264,17 +269,13 @@ async def get_recommendations(query: str, top_n: int = 10, include_query: bool =
     for _, row in rec_df.iterrows():
         key = hashlib.md5(f"{row['name']}|{row['artists']}".encode()).hexdigest()
         img, preview = itunes_meta.get(key, (None, None))
-        youtube_url = None
 
-        # Only use YouTube fallback if preview is not a direct audio file
-        if preview is None or not re.search(r"\.(mp3|m4a|wav|ogg)$", preview, re.IGNORECASE):
+        youtube_url = None
+        if not preview or not re.search(r"\.(mp3|m4a|wav|ogg)$", str(preview), re.IGNORECASE):
             yt_img, yt_url = await get_youtube_thumbnail_and_url(row['name'], row['artists'])
             img = img or yt_img or DEFAULT_ARTWORK
-            youtube_url = yt_url or None
-            preview = preview if preview and re.search(r"\.(mp3|m4a|wav|ogg)$", preview, re.IGNORECASE) else None
-        else:
-            preview = preview  # valid audio
-            youtube_url = None
+            youtube_url = yt_url
+            preview = None
 
         minutes = int(row["duration_ms"] // 60000)
         seconds = int((row["duration_ms"] % 60000) // 1000)
@@ -289,8 +290,8 @@ async def get_recommendations(query: str, top_n: int = 10, include_query: bool =
             "cluster": int(row["cluster"]),
             "cluster_mood": CLUSTER_NAMES.get(row["cluster"], "Unknown"),
             "artwork": img,
-            "preview": preview,       # only playable audio
-            "youtubeUrl": youtube_url  # fallback if preview is missing
+            "preview": preview,
+            "youtubeUrl": youtube_url,
         })
 
     return recs

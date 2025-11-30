@@ -1,12 +1,12 @@
-import React, { useRef, useEffect, useState } from "react";
-import YouTube from "react-youtube";
+// client/src/components/RecommendationCard.js
+import React, { useState, useEffect } from "react";
 import { addSongToPlaylist } from "../api/api";
 import "./RecommendationCard.css";
 
 const RecommendationCard = ({
   song = {},
-  currentPlaying,
-  setCurrentPlaying,
+  currentTrack,
+  setCurrentTrack,
   playlists = [],
   token,
   fetchPlaylists,
@@ -14,143 +14,173 @@ const RecommendationCard = ({
   onLike,
   onRemove,
 }) => {
-  const audioRef = useRef(null);
-  const [youtubePlayer, setYoutubePlayer] = useState(null);
-  const [selectedPlaylist, setSelectedPlaylist] = useState("");
   const [adding, setAdding] = useState(false);
-  const [liking, setLiking] = useState(false);
-  const [liked, setLiked] = useState(isLiked);
+  const [playlistId, setPlaylistId] = useState("");
+  const [localLiked, setLocalLiked] = useState(isLiked);
 
-  const songId = song?.id || `${song?.name}-${Array.isArray(song?.artists) ? song.artists.join(",") : song?.artists}`;
-
-  // Keep liked state synced
-  useEffect(() => setLiked(isLiked), [isLiked]);
-
-  // Pause other songs
   useEffect(() => {
-    if (currentPlaying !== songId) {
-      audioRef.current?.pause();
-      youtubePlayer?.pauseVideo();
-    }
-  }, [currentPlaying, songId, youtubePlayer]);
+    setLocalLiked(isLiked);
+  }, [isLiked]);
 
-  const togglePlay = () => {
-    if (song.preview) {
-      const audio = audioRef.current;
-      if (!audio) return;
-      if (currentPlaying === songId) {
-        audio.pause();
-        setCurrentPlaying(null);
+  const artistsText = Array.isArray(song.artists)
+    ? song.artists.join(", ")
+    : song.artists || "Unknown Artist";
+
+  const backendId = song.id || null;
+
+  const uiId =
+    backendId ||
+    `${song.name}-${Array.isArray(song.artists)
+      ? song.artists.join(",")
+      : song.artists}`;
+
+  const isPlaying = currentTrack?.id === uiId;
+
+  // -------------------------
+  // PLAY HANDLER
+  // -------------------------
+  const handlePlay = () => {
+    const hasPreview = !!song.preview;
+    const hasYouTube = !!song.youtubeUrl;
+
+    // Prefer audio preview
+    if (hasPreview) {
+      if (isPlaying) {
+        setCurrentTrack(null);
       } else {
-        setCurrentPlaying(songId);
-        audio.play();
+        setCurrentTrack({
+          id: uiId,
+          name: song.name,
+          artists: artistsText,
+          preview: song.preview,
+          artwork: song.artwork || "/placeholder.png",
+          youtubeUrl: song.youtubeUrl || null,
+        });
       }
-    } else if (song.youtubeId && youtubePlayer) {
-      if (currentPlaying === songId) {
-        youtubePlayer.pauseVideo();
-        setCurrentPlaying(null);
-      } else {
-        setCurrentPlaying(songId);
-        youtubePlayer.playVideo();
-      }
+      return;
     }
-  };
 
-  const handleLike = async () => {
-    if (!token || !onLike) return alert("You must be logged in!");
-    setLiking(true);
-    try {
-      await onLike({ ...song, id: songId });
-      setLiked((prev) => !prev);
-    } finally {
-      setLiking(false);
-    }
-  };
-
-  const handleAddToPlaylist = async () => {
-    if (!selectedPlaylist) return;
-    setAdding(true);
-    try {
-      await addSongToPlaylist(selectedPlaylist, {
-        id: songId,
-        name: song?.name || "Unknown Song",
-        artists: Array.isArray(song?.artists) ? song.artists.join(", ") : song?.artists || "Unknown Artist",
-        preview: song?.preview || "",
-        artwork: song?.artwork || "",
+    // Fallback → YouTube
+    if (hasYouTube) {
+      setCurrentTrack({
+        id: uiId,
+        name: song.name,
+        artists: artistsText,
+        preview: null,
+        artwork: song.artwork || "/placeholder.png",
+        youtubeUrl: song.youtubeUrl,
       });
-      alert(`${song?.name || "Song"} added to playlist!`);
-      setSelectedPlaylist("");
+      return;
+    }
+
+    alert("This track doesn't have a preview available.");
+  };
+
+  // -------------------------
+  // LIKE HANDLER
+  // -------------------------
+  const handleLike = async () => {
+    if (!token) return alert("Please sign in to save your favorite tracks.");
+    try {
+      await onLike(song);
+    } catch (err) {
+      console.error("Error liking song:", err);
+      alert("Couldn't update your favorites.");
+    }
+  };
+
+  // -------------------------
+  // PLAYLIST ADD HANDLER
+  // -------------------------
+  const handleAddToPlaylist = async () => {
+    if (!playlistId || !song) return;
+
+    try {
+      setAdding(true);
+      await addSongToPlaylist(playlistId, song);
+      setPlaylistId("");
       fetchPlaylists?.();
+      alert("Added to your playlist!");
     } catch (err) {
       console.error(err);
-      alert("Failed to add to playlist.");
+      alert("Couldn't add this track to your playlist.");
     } finally {
       setAdding(false);
     }
   };
 
-  const handleRemove = () => {
-    if (!onRemove) return;
-    if (window.confirm(`Remove "${song.name}" from playlist?`)) onRemove({ ...song, id: songId });
-  };
-
-  const songName = song?.name || "Unknown Song";
-  const artistText = Array.isArray(song?.artists) ? song.artists.join(", ") : song?.artists || "Unknown Artist";
-
   return (
     <div className="card">
-      <img src={song?.artwork || "/placeholder.png"} alt={songName} className="album-img" />
-      <h3 className="song-name">{songName}</h3>
-      <p className="artist"><strong>Artist:</strong> {artistText}</p>
-      <p className="mood"><strong>Mood:</strong> {song?.cluster_mood || "Unknown"}</p>
+      <img
+        src={song.artwork || "/placeholder.png"}
+        alt={song.name}
+        className="album-img"
+      />
 
-      {/* Audio preview */}
-      {song.preview && <audio ref={audioRef} src={song.preview} />}
+      <h3>{song.name || "Untitled Track"}</h3>
+      <p>{artistsText}</p>
 
-      {/* Hidden YouTube player */}
-      {!song.preview && song.youtubeId && (
-        <YouTube
-          videoId={song.youtubeId}
-          opts={{ height: "0", width: "0", playerVars: { autoplay: 0 } }}
-          onReady={(e) => setYoutubePlayer(e.target)}
-        />
+      {song.cluster_mood && (
+        <p className="mood">Vibe: {song.cluster_mood}</p>
       )}
 
       <div className="song-actions">
-        {/* Play button */}
-        <button onClick={togglePlay} className="small-button">
-          {currentPlaying === songId ? "⏸" : "▶️"}
+        {/* PLAY BUTTON */}
+        <button onClick={handlePlay}>
+          {song.preview
+            ? isPlaying
+              ? "⏸ Pause"
+              : "▶️ Play"
+            : "▶️ Preview"}
         </button>
 
-        {/* Like button */}
+        {/* LIKE */}
         {token && (
-          <button onClick={handleLike} className="small-button" disabled={liking}>
-            {liked ? "❤️" : "🤍"}
+          <button onClick={handleLike}>
+            {localLiked ? "❤️" : "🤍"}
           </button>
         )}
 
-        {/* Remove button */}
-        {onRemove && token && (
-          <button onClick={handleRemove} className="small-button remove-button">🗑</button>
+        {/* YOUTUBE BUTTON */}
+        {song.youtubeUrl && (
+          <button
+            onClick={() =>
+              window.open(song.youtubeUrl, "_blank", "noopener,noreferrer")
+            }
+          >
+            Watch on YouTube
+          </button>
         )}
 
-        {/* Add to playlist */}
-        {playlists.length > 0 && !onRemove && token && (
+        {/* REMOVE FROM LIST (playlists / favorites) */}
+        {onRemove && (
+          <button
+            onClick={() => onRemove(song)}
+            className="remove-button"
+            title="Remove from this list"
+          >
+            🗑
+          </button>
+        )}
+
+        {/* ADD TO PLAYLIST */}
+        {!onRemove && playlists.length > 0 && (
           <>
             <select
-              className="small-select"
-              value={selectedPlaylist}
-              onChange={(e) => setSelectedPlaylist(e.target.value)}
+              onChange={(e) => setPlaylistId(e.target.value)}
+              value={playlistId}
             >
-              <option value="">➕ Playlist</option>
-              {playlists.map((pl) => (
-                <option key={pl.id} value={pl.id}>{pl.name}</option>
+              <option value="">Add to playlist…</option>
+              {playlists.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
               ))}
             </select>
+
             <button
+              disabled={!playlistId || adding}
               onClick={handleAddToPlaylist}
-              className="small-button"
-              disabled={adding || !selectedPlaylist}
             >
               ➕
             </button>

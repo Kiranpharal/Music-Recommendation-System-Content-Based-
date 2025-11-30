@@ -1,178 +1,264 @@
-import React, { useState, useEffect } from "react";
+// client/src/App.js
+import React, { useState, useEffect, useCallback } from "react";
 import SearchBar from "./components/SearchBar";
 import RecommendationCard from "./components/RecommendationCard";
 import LikedSongs from "./components/LikedSongs";
 import Playlists from "./components/Playlists";
 import AuthPage from "./components/AuthPage";
-import { 
-  getRecommendations, 
-  fetchUserPlaylists, 
-  toggleLikeSong, 
-  fetchLikedSongs as apiFetchLikedSongs, 
-  api 
+import Sidebar from "./components/Sidebar";
+import GlobalPlayer from "./components/GlobalPlayer";
+import Profile from "./components/Profile";
+
+import {
+  getRecommendations,
+  fetchUserPlaylists,
+  toggleLikeSong,
+  fetchLikedSongs as apiFetchLikedSongs,
 } from "./api/api";
+
 import "./App.css";
 
-function App() {
+function App({ adminOnly = false }) {
+  /* ---------------------- STATE ---------------------- */
+  const [token, setToken] = useState(localStorage.getItem("accessToken") || "");
+  const [isAdminFlag, setIsAdminFlag] = useState(
+    localStorage.getItem("is_admin") === "true"
+  );
+
+  const isAuthenticated = !!token;
+
   const [recommendations, setRecommendations] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [currentPlaying, setCurrentPlaying] = useState(null);
   const [inputSong, setInputSong] = useState("");
-  const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [userPlaylists, setUserPlaylists] = useState([]);
   const [likedSongs, setLikedSongs] = useState([]);
-  const [showLogin, setShowLogin] = useState(!token);
-  const [showRegister, setShowRegister] = useState(false);
-  const [activePage, setActivePage] = useState("recommendations");
+  const [activePage, setActivePage] = useState("home");
+  const [currentTrack, setCurrentTrack] = useState(null);
 
-  // Fetch playlists
-  const fetchPlaylists = async () => {
+  /* ---------------------- LOGIN SUCCESS ---------------------- */
+  const handleLoginSuccess = useCallback(
+    (accessToken, refreshToken, isAdmin) => {
+      if (accessToken) {
+        localStorage.setItem("accessToken", accessToken);
+        setToken(accessToken);
+      }
+      if (refreshToken) {
+        localStorage.setItem("refreshToken", refreshToken);
+      }
+
+      if (isAdmin) {
+        localStorage.setItem("is_admin", "true");
+        setIsAdminFlag(true);
+        window.location.href = "/admin/dashboard";
+        return;
+      }
+
+      // Normal user
+      setIsAdminFlag(false);
+      localStorage.removeItem("is_admin");
+      setActivePage("home");
+    },
+    []
+  );
+
+  /* ---------------------- LOGOUT ---------------------- */
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    localStorage.removeItem("is_admin");
+
+    setToken("");
+    setIsAdminFlag(false);
+    setRecommendations([]);
+    setUserPlaylists([]);
+    setLikedSongs([]);
+    setCurrentTrack(null);
+    setInputSong("");
+    setError("");
+    setLoading(false);
+    setActivePage("home");
+  }, []);
+
+  /* ---------------------- FETCH PLAYLISTS ---------------------- */
+  const fetchPlaylists = useCallback(async () => {
     if (!token) return;
     try {
       const playlists = await fetchUserPlaylists();
-      setUserPlaylists(playlists || []);
+      setUserPlaylists(Array.isArray(playlists) ? playlists : []);
     } catch (err) {
       console.error("Error fetching playlists:", err);
     }
-  };
+  }, [token]);
 
-  // Fetch liked songs
-  const fetchLikedSongs = async () => {
+  /* ---------------------- FETCH LIKED SONGS ---------------------- */
+  const fetchLikedSongs = useCallback(async () => {
     if (!token) return;
     try {
       const songs = await apiFetchLikedSongs();
-      setLikedSongs(songs || []);
+      setLikedSongs(Array.isArray(songs) ? songs : []);
     } catch (err) {
       console.error("Error fetching liked songs:", err);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     if (token) {
       fetchPlaylists();
       fetchLikedSongs();
     }
-  }, [token]);
+  }, [token, fetchPlaylists, fetchLikedSongs]);
 
-  // Handle song search
+  /* ---------------------- SEARCH / RECOMMEND ---------------------- */
   const handleSongSelect = async (songName) => {
     if (!songName) return;
+
     setRecommendations([]);
     setError("");
     setLoading(true);
-    setCurrentPlaying(null);
+    setCurrentTrack(null);
     setInputSong(songName);
 
     try {
       const data = await getRecommendations(songName, 10);
-      const recs = Array.isArray(data.recommendations) ? data.recommendations : [];
+      const recs = Array.isArray(data.recommendations)
+        ? data.recommendations
+        : [];
+
       setRecommendations(recs);
       setActivePage("recommendations");
-      if (recs.length === 0) setError(`No recommendations found for "${songName}".`);
+
+      if (recs.length === 0) {
+        setError(`No matches found for “${songName}”. Try another track.`);
+      }
     } catch (e) {
       console.error(e);
-      setError(e.message || "❌ Song not found in dataset");
+      setError("We couldn’t find that song. Please try a different title.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Login
-  const handleLoginSuccess = (jwt) => {
-    localStorage.setItem("token", jwt);
-    setToken(jwt);
-    setShowLogin(false);
-    setShowRegister(false);
-    setActivePage("recommendations");
+  /* ---------------------- LIKE TOGGLE ---------------------- */
+  const buildSongId = (song) => {
+    return (
+      song.id ||
+      `${song.name}-${(
+        Array.isArray(song.artists) ? song.artists.join(",") : song.artists
+      )}`
+    );
   };
 
-  // Logout
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    setToken("");
-    setRecommendations([]);
-    setUserPlaylists([]);
-    setLikedSongs([]);
-    setShowLogin(true);
-    setShowRegister(false);
-    setActivePage("recommendations");
-  };
-
-  // Check if song is liked
   const isSongLiked = (song) => {
-    const songId = song.id || `${song.name}-${(Array.isArray(song.artists) ? song.artists.join(",") : song.artists)}`;
-    return likedSongs.some((s) => s.id === songId);
+    const id = buildSongId(song);
+    return likedSongs.some((s) => s.id === id);
   };
 
-  // Like/unlike toggle
   const handleLikeToggle = async (song) => {
-    if (!token) return alert("You must be logged in to like songs!");
+    if (!token) return alert("Sign in to save your favorite tracks.");
+
     try {
       const res = await toggleLikeSong(song);
-      const songId = song.id || `${song.name}-${(Array.isArray(song.artists) ? song.artists.join(",") : song.artists)}`;
+      const id = buildSongId(song);
 
-      if (res.liked) {
-        setLikedSongs((prev) => [...prev, { id: songId, ...song }]);
+      if (res?.liked) {
+        setLikedSongs((prev) =>
+          prev.some((s) => s.id === id) ? prev : [...prev, { id, ...song }]
+        );
       } else {
-        setLikedSongs((prev) => prev.filter((s) => s.id !== songId));
+        setLikedSongs((prev) => prev.filter((s) => s.id !== id));
       }
-
-      fetchPlaylists(); // refresh playlists
     } catch (err) {
-      console.error("Error toggling like:", err);
-      alert("Failed to update like status.");
+      console.error(err);
+      alert("We couldn’t update your favorites. Try again.");
     }
   };
 
-  // Remove song from playlist
-  const handleRemoveSongFromPlaylist = async (song, playlistId) => {
-    if (!token || !playlistId) return;
-    try {
-      const songId = song.id || `${song.name}-${(Array.isArray(song.artists) ? song.artists.join(",") : song.artists)}`;
-      await api.delete(`/playlists/${playlistId}/songs/${songId}`);
-      fetchPlaylists();
-      alert(`${song.name} removed from playlist`);
-    } catch (err) {
-      console.error("Error removing song from playlist:", err);
-      alert("Failed to remove song from playlist");
-    }
-  };
+  /* -------------------------------------------------------
+     ADMIN-ONLY MODE
+  ------------------------------------------------------- */
+  if (adminOnly) {
+    return (
+      <AuthPage
+        onLoginSuccess={(access, refresh, isAdmin) =>
+          handleLoginSuccess(access, refresh, isAdmin)
+        }
+      />
+    );
+  }
 
+  /* -------------------------------------------------------
+     USER MODE — REQUIRE LOGIN
+  ------------------------------------------------------- */
+  if (!isAuthenticated) {
+    return <AuthPage onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  /* -------------------------------------------------------
+     MAIN USER APPLICATION
+  ------------------------------------------------------- */
   return (
-    <div className="App">
-      {!token ? (
-        <AuthPage
-          onLoginSuccess={handleLoginSuccess}
-          showLogin={showLogin}
-          showRegister={showRegister}
-          setShowLogin={setShowLogin}
-          setShowRegister={setShowRegister}
-        />
-      ) : (
-        <>
-          <nav className="user-nav">
-            <button onClick={() => setActivePage("recommendations")} className={activePage === "recommendations" ? "active" : ""}>Recommendations</button>
-            <button onClick={() => setActivePage("liked")} className={activePage === "liked" ? "active" : ""}>Liked Songs</button>
-            <button onClick={() => setActivePage("playlists")} className={activePage === "playlists" ? "active" : ""}>Playlists</button>
-            <button onClick={handleLogout}>Logout</button>
-          </nav>
+    <>
+      <Sidebar
+        activePage={activePage}
+        setActivePage={setActivePage}
+        onLogout={handleLogout}
+      />
 
-          <SearchBar onSongSelect={handleSongSelect} token={token} />
+      <div className="App">
+        <SearchBar onSongSelect={handleSongSelect} />
 
-          {loading && <p className="loading">Loading recommendations…</p>}
-          {error && !loading && <p className="error">{error}</p>}
+        {loading && <p className="loading">Finding great music for you…</p>}
+        {error && !loading && <p className="error">{error}</p>}
 
-          {activePage === "recommendations" && !loading && recommendations.length > 0 && (
+        {/* ---------------- HOME ---------------- */}
+        {activePage === "home" && (
+          <div className="home-page">
+            <h2>Welcome to TuneFlow</h2>
+            <p className="home-sub">
+              Search for any song and discover personalized recommendations powered by AI.
+            </p>
+
+            {likedSongs.length > 0 && (
+              <>
+                <h3 className="home-section-title">Your Favorites</h3>
+
+                <div className="recommendations">
+                  {likedSongs.slice(0, 4).map((song, idx) => (
+                    <RecommendationCard
+                      key={song.id || `${song.name}-${idx}`}
+                      song={song}
+                      currentTrack={currentTrack}
+                      setCurrentTrack={setCurrentTrack}
+                      playlists={userPlaylists}
+                      token={token}
+                      fetchPlaylists={fetchPlaylists}
+                      isLiked={true}
+                      onLike={handleLikeToggle}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ---------------- RECOMMENDATIONS ---------------- */}
+        {activePage === "recommendations" &&
+          !loading &&
+          recommendations.length > 0 && (
             <>
-              <h2 className="recommendation-heading">Recommended songs for: <em>{inputSong}</em></h2>
+              <h2 className="recommendation-heading">
+                Recommendations based on <em>{inputSong}</em>
+              </h2>
+
               <div className="recommendations">
                 {recommendations.map((song, idx) => (
                   <RecommendationCard
                     key={song.id || `${song.name}-${idx}`}
                     song={song}
-                    currentPlaying={currentPlaying}
-                    setCurrentPlaying={setCurrentPlaying}
+                    currentTrack={currentTrack}
+                    setCurrentTrack={setCurrentTrack}
                     playlists={userPlaylists}
                     token={token}
                     fetchPlaylists={fetchPlaylists}
@@ -184,31 +270,35 @@ function App() {
             </>
           )}
 
-          {activePage === "liked" && token && (
-            <LikedSongs
-              token={token}
-              likedSongs={likedSongs}
-              currentPlaying={currentPlaying}
-              setCurrentPlaying={setCurrentPlaying}
-              onLike={handleLikeToggle}
-              fetchLikedSongs={fetchLikedSongs}
-            />
-          )}
+        {/* ---------------- LIKED SONGS ---------------- */}
+        {activePage === "liked" && (
+          <LikedSongs
+            token={token}
+            likedSongs={likedSongs}
+            currentTrack={currentTrack}
+            setCurrentTrack={setCurrentTrack}
+            onLike={handleLikeToggle}
+            fetchLikedSongs={fetchLikedSongs}
+          />
+        )}
 
-          {activePage === "playlists" && token && (
-            <Playlists
-              token={token}
-              fetchPlaylists={fetchPlaylists}
-              likedSongs={likedSongs}
-              onLike={handleLikeToggle}
-              onRemoveSong={handleRemoveSongFromPlaylist}
-              currentPlaying={currentPlaying}
-              setCurrentPlaying={setCurrentPlaying}
-            />
-          )}
-        </>
-      )}
-    </div>
+        {/* ---------------- PLAYLISTS ---------------- */}
+        {activePage === "playlists" && (
+          <Playlists
+            token={token}
+            onLike={handleLikeToggle}
+            fetchPlaylists={fetchPlaylists}
+            currentTrack={currentTrack}
+            setCurrentTrack={setCurrentTrack}
+          />
+        )}
+
+        {/* ---------------- PROFILE ---------------- */}
+        {activePage === "profile" && <Profile />}
+      </div>
+
+      <GlobalPlayer currentTrack={currentTrack} setCurrentTrack={setCurrentTrack} />
+    </>
   );
 }
 

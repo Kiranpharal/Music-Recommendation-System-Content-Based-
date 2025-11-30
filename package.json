@@ -5,7 +5,7 @@
   "scripts": {
     "start": "concurrently \"npm run frontend\" \"npm run backend\"",
     "frontend": "cd client && npm start",
-    "backend": "cd server && uvicorn app.main:app --reload"
+    "backend": "cd server && ..\\.venv\\Scripts\\python.exe -m uvicorn app.main:app --reload"
   },
   "devDependencies": {
     "concurrently": "^9.2.0"

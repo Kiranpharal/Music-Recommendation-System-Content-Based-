@@ -1,189 +1,129 @@
+// client/src/components/Playlists.jsx
 import React, { useEffect, useState } from "react";
 import {
-  api,
   fetchUserPlaylists,
   removeSongFromPlaylist,
   deletePlaylist,
+  createPlaylist,
 } from "../api/api";
 import RecommendationCard from "./RecommendationCard";
+import "./Playlists.css";
 
 export default function Playlists({
   token,
-  likedSongs,            // from App.js
-  onLike,                // like toggle from App.js
-  fetchPlaylists: parentFetchPlaylists, // optional refresh from App.js
-  currentPlaying,        // App-level
-  setCurrentPlaying,     // App-level
+  onLike,
+  fetchPlaylists: parentFetchPlaylists,
+  currentTrack,
+  setCurrentTrack,
 }) {
   const [playlists, setPlaylists] = useState([]);
   const [selectedPlaylist, setSelectedPlaylist] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [newPlaylistName, setNewPlaylistName] = useState("");
   const [creating, setCreating] = useState(false);
-  const [removing, setRemoving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [updating, setUpdating] = useState(false);
 
-  // Fetch playlists
   const fetchPlaylistsHandler = async () => {
     if (!token) return;
-    setLoading(true);
     try {
-      const data = await fetchUserPlaylists(token); // ✅ pass token
-      // ✅ normalize artwork for all songs
-      const normalized = (data || []).map((pl) => ({
-        ...pl,
-        songs: (pl.songs || []).map((song) => ({
-          ...song,
-          artwork:
-            song.artwork || song.image || song.cover || "/placeholder.png",
-        })),
-      }));
-      setPlaylists(normalized);
-
-      if (selectedPlaylist) {
-        const updated = normalized.find((pl) => pl.id === selectedPlaylist.id);
-        setSelectedPlaylist(updated || null);
-      }
+      const data = await fetchUserPlaylists();
+      setPlaylists(data || []);
     } catch (err) {
       console.error("Error fetching playlists:", err);
-    } finally {
-      setLoading(false);
     }
   };
 
   useEffect(() => {
     if (token) fetchPlaylistsHandler();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  // Create new playlist
+  // CREATE PLAYLIST
   const handleCreatePlaylist = async () => {
-    if (!newPlaylistName.trim()) return;
+    const name = newPlaylistName.trim();
+    if (!name) return;
+
     setCreating(true);
     try {
-      await api.post(
-        "/playlists",
-        { name: newPlaylistName },
-        { headers: { Authorization: `Bearer ${token}` } } // ✅ include token
-      );
+      await createPlaylist(name);
       setNewPlaylistName("");
       await fetchPlaylistsHandler();
-      if (parentFetchPlaylists) parentFetchPlaylists();
+      parentFetchPlaylists?.();
     } catch (err) {
       console.error("Error creating playlist:", err);
-      alert("Failed to create playlist.");
+      alert("We couldn’t create your playlist. Please try again.");
     } finally {
       setCreating(false);
     }
   };
 
-  // Remove a song from the selected playlist
+  // REMOVE SONG
   const handleRemoveSong = async (song) => {
     if (!token || !selectedPlaylist) return;
-    const songId =
-      song.id ||
-      `${song.name}-${
-        Array.isArray(song.artists) ? song.artists.join(",") : song.artists
-      }`;
-    setRemoving(true);
+
+    setUpdating(true);
     try {
-      await removeSongFromPlaylist(selectedPlaylist.id, songId, token); // ✅ pass token
+      await removeSongFromPlaylist(selectedPlaylist.id, song.id);
+
+      // Refresh playlists + selected playlist
       await fetchPlaylistsHandler();
-      if (parentFetchPlaylists) parentFetchPlaylists();
+      const updated = (await fetchUserPlaylists()).find(
+        (p) => p.id === selectedPlaylist.id
+      );
+      setSelectedPlaylist(updated || null);
     } catch (err) {
       console.error("Error removing song:", err);
-      alert("Failed to remove song.");
+      alert("We couldn’t remove this track. Please try again.");
     } finally {
-      setRemoving(false);
+      setUpdating(false);
     }
   };
 
-  // ✅ Delete an entire playlist
+  // DELETE PLAYLIST
   const handleDeletePlaylist = async () => {
-    if (!token || !selectedPlaylist) return;
-    if (!window.confirm(`Delete playlist "${selectedPlaylist.name}"?`)) return;
-    setDeleting(true);
+    if (!selectedPlaylist) return;
+
+    const yes = window.confirm(
+      `Delete playlist “${selectedPlaylist.name}”? This can’t be undone.`
+    );
+    if (!yes) return;
+
+    setUpdating(true);
     try {
       await deletePlaylist(selectedPlaylist.id);
-      setSelectedPlaylist(null); // go back after deleting
+      setSelectedPlaylist(null);
       await fetchPlaylistsHandler();
-      if (parentFetchPlaylists) parentFetchPlaylists();
+      parentFetchPlaylists?.();
     } catch (err) {
       console.error("Error deleting playlist:", err);
-      alert("Failed to delete playlist.");
+      alert("We couldn’t delete your playlist. Please try again.");
     } finally {
-      setDeleting(false);
+      setUpdating(false);
     }
-  };
-
-  // Check if a song is liked
-  const isSongLiked = (song) => {
-    const songId =
-      song.id ||
-      `${song.name}-${
-        Array.isArray(song.artists) ? song.artists.join(",") : song.artists
-      }`;
-    return likedSongs.some((s) => s.id === songId);
   };
 
   return (
     <div className="playlists-page">
       <h2>Your Playlists</h2>
 
-      {/* Create playlist */}
+      {/* CREATE NEW PLAYLIST */}
       <div className="create-playlist">
         <input
           type="text"
+          placeholder="Name your new playlist…"
           value={newPlaylistName}
           onChange={(e) => setNewPlaylistName(e.target.value)}
-          placeholder="New playlist name"
         />
         <button onClick={handleCreatePlaylist} disabled={creating}>
-          {creating ? "Creating…" : "Create Playlist"}
+          {creating ? "Creating…" : "Create"}
         </button>
       </div>
 
-      {loading ? (
-        <p>Loading…</p>
-      ) : playlists.length === 0 ? (
-        <p>You have no playlists yet.</p>
-      ) : selectedPlaylist ? (
-        <>
-          <button onClick={() => setSelectedPlaylist(null)}>
-            ← Back to Playlists
-          </button>
-          <h3>{selectedPlaylist.name}</h3>
-
-          {/* ✅ Delete playlist button */}
-          <button
-            className="delete-btn"
-            onClick={handleDeletePlaylist}
-            disabled={deleting}
-          >
-            {deleting ? "Deleting…" : "Delete Playlist"}
-          </button>
-
-          {selectedPlaylist.songs?.length === 0 ? (
-            <p>No songs in this playlist yet.</p>
-          ) : (
-            <div className="recommendations">
-              {selectedPlaylist.songs.map((song, idx) => (
-                <RecommendationCard
-                  key={`${song.id || song.name}-${idx}`}
-                  song={song}
-                  currentPlaying={currentPlaying}
-                  setCurrentPlaying={setCurrentPlaying}
-                  playlists={playlists}
-                  token={token}
-                  fetchPlaylists={fetchPlaylistsHandler}
-                  onLike={onLike}
-                  onRemove={handleRemoveSong}
-                  isLiked={isSongLiked(song)}
-                />
-              ))}
-            </div>
-          )}
-          {(removing || deleting) && <p>Updating playlist…</p>}
-        </>
+      {/* PLAYLIST LIST */}
+      {playlists.length === 0 ? (
+        <p className="empty-text">
+          You haven’t created any playlists yet. Make your first one above and
+          start building your sound.
+        </p>
       ) : (
         <ul className="playlist-list">
           {playlists.map((pl) => (
@@ -192,6 +132,65 @@ export default function Playlists({
             </li>
           ))}
         </ul>
+      )}
+
+      {/* PLAYLIST DETAILS MODAL */}
+      {selectedPlaylist && (
+        <div
+          className="playlist-modal-backdrop"
+          onClick={() => setSelectedPlaylist(null)}
+        >
+          <div
+            className="playlist-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="playlist-modal-header">
+              <div>
+                <h3>{selectedPlaylist.name}</h3>
+                <p>{selectedPlaylist.songs?.length || 0} tracks</p>
+              </div>
+
+              <button
+                className="delete-btn"
+                onClick={handleDeletePlaylist}
+                disabled={updating}
+              >
+                Delete Playlist
+              </button>
+            </div>
+
+            {updating && <p>Updating playlist…</p>}
+
+            <div className="playlist-songs-grid">
+              {selectedPlaylist.songs?.length ? (
+                selectedPlaylist.songs.map((song, idx) => (
+                  <RecommendationCard
+                    key={song.id || `${song.name}-${idx}`}
+                    song={song}
+                    currentTrack={currentTrack}
+                    setCurrentTrack={setCurrentTrack}
+                    playlists={[]}
+                    token={token}
+                    onLike={onLike}
+                    isLiked={false}
+                    onRemove={handleRemoveSong}
+                  />
+                ))
+              ) : (
+                <p>
+                  This playlist is empty. Add some tracks and create your vibe.
+                </p>
+              )}
+            </div>
+
+            <button
+              className="playlist-modal-close"
+              onClick={() => setSelectedPlaylist(null)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
