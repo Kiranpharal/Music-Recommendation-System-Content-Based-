@@ -1,13 +1,6 @@
 from __future__ import annotations
 
 # --------------------------------------------
-# PICKLE PATHS
-# --------------------------------------------
-import sys
-import app as app_package
-sys.modules['app'] = app_package
-
-# --------------------------------------------
 # Standard imports
 # --------------------------------------------
 import os, ast, json, hashlib, asyncio, httpx, re
@@ -19,7 +12,7 @@ from difflib import get_close_matches
 from joblib import Memory, dump, load
 from bs4 import BeautifulSoup
 
-# sklearn fallback (since FAISS does NOT support Python 3.14)
+# sklearn fallback (FAISS doesn’t support Python 3.14)
 from sklearn.neighbors import NearestNeighbors
 
 from .utils import MyMinMaxScaler, kmeans_mini_batch
@@ -35,7 +28,7 @@ memory = Memory(str(CACHE_DIR), verbose=0)
 CSV_PATH = BASE_DIR / "dataset" / "master_tracks.csv"
 SCALER_FILE = CACHE_DIR / "scaler.joblib"
 LABEL_FILE = CACHE_DIR / "labels.npy"
-INDEX_FILE = CACHE_DIR / "nn_index.joblib"        # sklearn index
+INDEX_FILE = CACHE_DIR / "nn_index.joblib"
 ITUNES_CACHE_FILE = CACHE_DIR / "itunes_cache.json"
 
 # -------------------------
@@ -101,7 +94,7 @@ else:
 NUM_CLUSTERS = 150
 
 def cluster_data(X, n_clusters=NUM_CLUSTERS):
-    labels, _ = kmeans_mini_batch(X, k=n_clusters, batch_size=100_000, max_iter=200)
+    labels, _ = kmeans_mini_batch(X, k=n_clusters, batch_size=100000, max_iter=200)
     np.save(LABEL_FILE, labels)
     return labels
 
@@ -139,7 +132,7 @@ CLUSTER_NAMES = {
 title_map = {name.lower(): idx for idx, name in enumerate(df['name'])}
 
 # -------------------------
-# NearestNeighbors index (FAISS alternative)
+# NearestNeighbors index
 # -------------------------
 if INDEX_FILE.exists():
     nn = load(INDEX_FILE)
