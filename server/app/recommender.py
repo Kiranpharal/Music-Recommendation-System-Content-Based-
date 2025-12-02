@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 # --------------------------------------------
-# FIX FOR OLD PICKLE PATHS (IMPORTANT)
+# PICKLE PATHS
 # --------------------------------------------
 import sys
 import app as app_package

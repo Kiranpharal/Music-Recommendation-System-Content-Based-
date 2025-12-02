@@ -39,7 +39,7 @@ const AdminProtected = ({ children }) => {
 
 /* --------------------------------------------------------
    Clean SPA redirect:
-   "/" now checks if admin → redirect to /admin/dashboard
+   "/" checks if admin → redirect to /admin/dashboard
 -------------------------------------------------------- */
 const AdminRedirect = () => {
   const isAdmin = localStorage.getItem("is_admin") === "true";
