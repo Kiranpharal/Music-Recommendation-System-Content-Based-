@@ -77,3 +77,6 @@ client/src/components/music.avif
 
 # Ignore generated admin assets
 client/src/admin/*.css
+
+server/app/cache/
+*/cache/
