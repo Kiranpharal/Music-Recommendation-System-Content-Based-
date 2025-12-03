@@ -80,3 +80,6 @@ client/src/admin/*.css
 
 server/app/cache/
 */cache/
+server/app/dataset/
+server/app/dataset/*.csv
+server/app/dataset/master_tracks.csv
